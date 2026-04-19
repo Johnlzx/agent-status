@@ -9,6 +9,8 @@ struct HookEvent: Decodable, Sendable {
     let transcriptPath: String?
     let toolName: String?
     let clientTs: Int64?
+    let hostTty: String?
+    let hostPid: Int32?
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
@@ -19,6 +21,8 @@ struct HookEvent: Decodable, Sendable {
         case transcriptPath = "transcript_path"
         case toolName = "tool_name"
         case clientTs = "client_ts"
+        case hostTty = "host_tty"
+        case hostPid = "host_pid"
     }
 
     var effectiveEventName: String {

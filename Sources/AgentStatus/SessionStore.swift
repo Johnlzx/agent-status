@@ -36,13 +36,20 @@ final class SessionStore {
             id: id,
             kind: .claudeCode,
             cwd: event.cwd ?? "",
-            pid: nil,
+            pid: event.hostPid,
             state: .idle,
             lastEventAt: now,
             lastEventName: nil,
-            note: nil
+            note: nil,
+            hostTTY: event.hostTty,
+            hostPID: event.hostPid
         )
         if let cwd = event.cwd, !cwd.isEmpty { session.cwd = cwd }
+        if let tty = event.hostTty, !tty.isEmpty { session.hostTTY = tty }
+        if let pid = event.hostPid, pid > 0 {
+            session.hostPID = pid
+            session.pid = pid
+        }
         session.lastEventAt = now
         session.lastEventName = event_name
 
@@ -75,7 +82,7 @@ final class SessionStore {
         sessions[id] = session
     }
 
-    func upsertCodex(pid: Int32, cwd: String) {
+    func upsertCodex(pid: Int32, cwd: String, tty: String?) {
         let id = "codex:\(pid)"
         let now = Date()
         var s = sessions[id] ?? Session(
@@ -86,9 +93,13 @@ final class SessionStore {
             state: .running,
             lastEventAt: now,
             lastEventName: nil,
-            note: "coarse"
+            note: "coarse",
+            hostTTY: tty,
+            hostPID: pid
         )
         if !cwd.isEmpty { s.cwd = cwd }
+        if let tty, !tty.isEmpty { s.hostTTY = tty }
+        s.hostPID = pid
         s.lastEventAt = now
         s.state = .running
         s.note = "coarse"

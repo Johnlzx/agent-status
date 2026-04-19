@@ -25,15 +25,22 @@ final class CodexScanner: @unchecked Sendable {
         let entries = Self.findCodexProcesses()
         var pids = Set<Int32>()
         var cwds: [Int32: String] = [:]
+        var ttys: [Int32: String] = [:]
         for e in entries {
             pids.insert(e.pid)
             cwds[e.pid] = Self.readCwd(pid: e.pid) ?? ""
+            ttys[e.pid] = Self.readTTY(pid: e.pid) ?? ""
         }
         let alivePids = pids
         let cwdByPid = cwds
+        let ttyByPid = ttys
         await MainActor.run {
             for e in entries {
-                store.upsertCodex(pid: e.pid, cwd: cwdByPid[e.pid] ?? "")
+                store.upsertCodex(
+                    pid: e.pid,
+                    cwd: cwdByPid[e.pid] ?? "",
+                    tty: ttyByPid[e.pid]
+                )
             }
             store.reconcileCodex(alivePids: alivePids)
             store.sweepStale()
@@ -63,6 +70,14 @@ final class CodexScanner: @unchecked Sendable {
             }
         }
         return result
+    }
+
+    static func readTTY(pid: Int32) -> String? {
+        guard let out = runCommand("/bin/ps", ["-o", "tty=", "-p", "\(pid)"]) else {
+            return nil
+        }
+        let tty = out.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (tty.isEmpty || tty == "??") ? nil : tty
     }
 
     static func readCwd(pid: Int32) -> String? {

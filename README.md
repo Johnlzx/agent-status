@@ -88,10 +88,22 @@ Your previous `~/.claude/settings.json` backups are kept as `~/.claude/settings.
 
 Each hook invocation fires a 1-second `nc -U -N`; if the socket is missing the script exits 0 without writing, so your Claude session is never slowed.
 
+## Click a row to focus its terminal
+
+Every row in the dropdown is a button. Click one and the terminal window/tab that's running that session is brought to the front.
+
+How the lookup works:
+
+1. The hook script (or Codex scanner) records the `host_tty` and `host_pid` of the session — specifically the first ancestor process that has a controlling terminal. For Claude Code, walking up the hook's process tree almost always lands on the `claude` process itself; for Codex the pid is the codex process.
+2. On click, the app walks up the process tree from `host_pid` looking for the first ancestor that's a registered `NSRunningApplication` with `.regular` activation policy — that's the terminal emulator.
+3. It activates that app. If the emulator is **Terminal.app** or **iTerm2**, an AppleScript then targets the specific tab whose `tty` matches. Other emulators (Ghostty, Warp, Alacritty, Kitty, WezTerm, …) get activated to the front but not per-tab — those emulators don't expose stable per-tab scripting APIs.
+
+**First-time permission prompt:** the first click targeting Terminal.app or iTerm2 will ask for Automation permission. Grant it once and click-to-focus works going forward. Declining just means activation only (app comes forward; exact tab isn't selected).
+
 ## Roadmap
 
 - [ ] Launch at login (`ServiceManagement`)
-- [ ] Click session → focus its terminal (needs Accessibility perm)
+- [ ] Per-tab focus for Ghostty / Warp / Alacritty / Kitty / WezTerm (accessibility API fallback)
 - [ ] Codex activity heuristic via `~/.codex/history.jsonl` mtime
 - [ ] Optional notification sound on `WAIT`
 - [ ] Optional icon assets (currently SF Symbols only)
