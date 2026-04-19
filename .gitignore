@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+Package.resolved
+*.app/
+build/
+dist/
+.DS_Store
+*.xcodeproj
+*.xcworkspace
