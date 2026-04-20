@@ -1,20 +1,20 @@
 # agent-status
 
-A tiny macOS menu bar app that shows the live state of every running **Claude Code** and **Codex** CLI session across your terminals.
+A pixel-art steampunk menu bar watchtower for your **Claude Code** sessions.
 
 Three states per session:
 
 | State | Meaning |
 |---|---|
 | `IDLE` | Session alive, no turn in progress |
-| `RUN`  | Tool call or inference happening |
-| `WAIT` | Paused on a permission prompt — **you** need to go look at the terminal |
+| `RUN`  | Tool call or inference happening — gear rotates |
+| `WAIT` | Paused on a permission prompt — gear pulses rust-red, **you need to look** |
 
 The menu bar icon aggregates across all sessions:
-- **orange** — at least one session is waiting for you
-- **green**  — something is running
-- **grey**   — everything idle
-- **moon**   — no sessions at all
+- **rust red, pulsing** — at least one session is waiting for you
+- **amber, rotating**  — something is running
+- **dim brass**        — everything idle
+- **crescent moon**    — no sessions at all
 
 ## How it works
 
@@ -22,13 +22,13 @@ The menu bar icon aggregates across all sessions:
 Claude Code hooks ──JSON──▶  Unix socket  ──▶  SwiftUI MenuBarExtra
                               (SessionStart, PreToolUse, PermissionRequest,
                                PostToolUse, Stop, SessionEnd, UserPromptSubmit)
-
-Codex CLI processes ──ps + lsof (2s poll)──▶  same store
 ```
 
 Claude Code emits hook events into `~/.claude/settings.json`; the install script wires in a shell script that forwards each event as one line of JSON to `~/Library/Application Support/AgentStatus/ipc.sock`. The menu bar app listens there and maintains an in-memory `session_id → state` map.
 
-Codex has no hooks, so it gets a coarse process-presence signal (labelled `coarse` in the UI). Shows `RUN` while the process exists and disappears when it exits.
+## Visual style
+
+Everything is drawn on a 14-pixel grid — gears, gauges, rivets — using SwiftUI `Canvas` with no anti-aliasing. The title bar is a brass plate with rivets in the corners; rows are metal plates with brass-beveled state pills; the body font is **Press Start 2P** (bundled, SIL OFL licensed). Palette is oxidized brass / copper / amber / rust on an oily brown background.
 
 ## Requirements
 
@@ -50,7 +50,7 @@ open ./dist/AgentStatus.app
 ./Hooks/install.sh
 ```
 
-Start a Claude Code or Codex session in any terminal; it should show up in the menu within a second.
+Start a Claude Code session in any terminal; it should show up in the menu within a second.
 
 ## Uninstall
 
@@ -64,9 +64,9 @@ Your previous `~/.claude/settings.json` backups are kept as `~/.claude/settings.
 ## Design notes
 
 - **Why hooks?** They're the only documented, reliable signal for "waiting for user confirmation". Accessibility scraping of the terminal is fragile and requires permissions. Process CPU heuristics can't distinguish `WAIT` from `IDLE`.
-- **Why Unix socket, not a file?** Events are immediate; no polling; no stale-file edge cases. One connection per hook invocation (open, write one JSON line, close). If the app isn't running, `nc` silently fails — the hook never blocks Claude Code.
-- **Session identity**: `session_id` for Claude Code (from the hook JSON), `codex:<pid>` for Codex.
-- **Staleness**: a Claude Code session with no event for 30 min is marked `?` (unknown) rather than removed, so it stays visible but visibly stale.
+- **Why Unix socket, not a file?** Events are immediate; no polling; no stale-file edge cases. One connection per hook invocation (open, write one JSON line, close). If the app isn't running, the hook silently fails — Claude Code is never blocked.
+- **Session identity**: `session_id` from the hook JSON.
+- **Staleness**: a session with no event for 30 min is marked `STALE` (greyed out) rather than removed, so it stays visible but visibly stale.
 
 ## Hook wiring details
 

@@ -4,30 +4,25 @@ struct StatusBarLabel: View {
     @Bindable var store: SessionStore
 
     var body: some View {
-        let p = presentation
         HStack(spacing: 3) {
-            Image(systemName: p.symbol)
+            PixelGear(
+                palette: GearPalette.forState(aggregate),
+                pixels: 14,
+                rotates: aggregate == .running,
+                rpm: 0.35,
+                pulses: aggregate == .waiting
+            )
+            .frame(width: 18, height: 18)
+
             if store.sessions.count > 1 {
                 Text("\(store.sessions.count)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .monospacedDigit()
+                    .font(SteampunkFonts.pixel(9))
+                    .foregroundStyle(Steam.amberHot)
             }
         }
     }
 
-    private var presentation: (symbol: String, tone: String) {
-        if store.sessions.isEmpty {
-            return ("moon.zzz", "dim")
-        }
-        switch store.aggregateState {
-        case .waiting:
-            return ("exclamationmark.circle.fill", "warn")
-        case .running:
-            return ("circle.fill", "active")
-        case .idle:
-            return ("circle", "idle")
-        case .unknown:
-            return ("questionmark.circle", "idle")
-        }
+    private var aggregate: AgentState {
+        store.sessions.isEmpty ? .unknown : store.aggregateState
     }
 }

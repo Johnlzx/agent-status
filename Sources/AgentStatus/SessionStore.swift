@@ -7,10 +7,7 @@ final class SessionStore {
     private(set) var sessions: [String: Session] = [:]
 
     var ordered: [Session] {
-        sessions.values.sorted { a, b in
-            if a.kind != b.kind { return a.kind.rawValue < b.kind.rawValue }
-            return a.lastEventAt > b.lastEventAt
-        }
+        sessions.values.sorted { a, b in a.lastEventAt > b.lastEventAt }
     }
 
     var aggregateState: AgentState {
@@ -25,18 +22,16 @@ final class SessionStore {
     func applyClaudeEvent(_ event: HookEvent) {
         let now = Date()
         let id = event.sessionId
-        let event_name = event.effectiveEventName
+        let eventName = event.effectiveEventName
 
-        if event_name == "SessionEnd" {
+        if eventName == "SessionEnd" {
             sessions.removeValue(forKey: id)
             return
         }
 
         var session = sessions[id] ?? Session(
             id: id,
-            kind: .claudeCode,
             cwd: event.cwd ?? "",
-            pid: event.hostPid,
             state: .idle,
             lastEventAt: now,
             lastEventName: nil,
@@ -46,20 +41,17 @@ final class SessionStore {
         )
         if let cwd = event.cwd, !cwd.isEmpty { session.cwd = cwd }
         if let tty = event.hostTty, !tty.isEmpty { session.hostTTY = tty }
-        if let pid = event.hostPid, pid > 0 {
-            session.hostPID = pid
-            session.pid = pid
-        }
+        if let pid = event.hostPid, pid > 0 { session.hostPID = pid }
         session.lastEventAt = now
-        session.lastEventName = event_name
+        session.lastEventName = eventName
 
-        switch event_name {
+        switch eventName {
         case "SessionStart":
             session.state = .idle
             session.note = nil
         case "UserPromptSubmit", "PreToolUse":
             session.state = .running
-            if event_name == "PreToolUse", let tool = event.toolName {
+            if eventName == "PreToolUse", let tool = event.toolName {
                 session.note = tool
             }
         case "PermissionRequest":
@@ -82,41 +74,9 @@ final class SessionStore {
         sessions[id] = session
     }
 
-    func upsertCodex(pid: Int32, cwd: String, tty: String?) {
-        let id = "codex:\(pid)"
-        let now = Date()
-        var s = sessions[id] ?? Session(
-            id: id,
-            kind: .codex,
-            cwd: cwd,
-            pid: pid,
-            state: .running,
-            lastEventAt: now,
-            lastEventName: nil,
-            note: "coarse",
-            hostTTY: tty,
-            hostPID: pid
-        )
-        if !cwd.isEmpty { s.cwd = cwd }
-        if let tty, !tty.isEmpty { s.hostTTY = tty }
-        s.hostPID = pid
-        s.lastEventAt = now
-        s.state = .running
-        s.note = "coarse"
-        sessions[id] = s
-    }
-
-    func reconcileCodex(alivePids: Set<Int32>) {
-        for (id, s) in sessions where s.kind == .codex {
-            if let pid = s.pid, !alivePids.contains(pid) {
-                sessions.removeValue(forKey: id)
-            }
-        }
-    }
-
     func sweepStale(thresholdSeconds: TimeInterval = 30 * 60) {
         let now = Date()
-        for (id, s) in sessions where s.kind == .claudeCode {
+        for (id, s) in sessions {
             if now.timeIntervalSince(s.lastEventAt) > thresholdSeconds && s.state != .unknown {
                 var next = s
                 next.state = .unknown

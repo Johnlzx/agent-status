@@ -1,6 +1,6 @@
 #!/bin/bash
-# bundle.sh — wrap the SwiftPM release binary into AgentStatus.app.
-# Requires build.sh to have run first (or will run it).
+# bundle.sh — wrap the SwiftPM release binary into AgentStatus.app and copy
+# bundled fonts into Contents/Resources.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -21,10 +21,19 @@ cp "$BIN" "$APP_DIR/Contents/MacOS/AgentStatus"
 chmod +x "$APP_DIR/Contents/MacOS/AgentStatus"
 cp "$ROOT/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 
+# Copy any bundled fonts into Resources/ at the root (so Bundle.main.url()
+# can find them by filename without a subpath).
+if [[ -d "$ROOT/Resources/Fonts" ]]; then
+    cp "$ROOT/Resources/Fonts/"*.ttf "$APP_DIR/Contents/Resources/" 2>/dev/null || true
+    # Keep the license alongside the font inside the bundle.
+    cp "$ROOT/Resources/Fonts/OFL.txt" "$APP_DIR/Contents/Resources/OFL.txt" 2>/dev/null || true
+fi
+
 # Clear quarantine so local run doesn't get flagged.
 xattr -cr "$APP_DIR" 2>/dev/null || true
 
-# Ad-hoc sign so macOS treats it as a valid executable bundle even without a dev cert.
+# Ad-hoc sign so macOS treats it as a valid executable bundle even without
+# a developer certificate.
 codesign --force --deep --sign - "$APP_DIR" 2>/dev/null || true
 
 echo "bundled: $APP_DIR"

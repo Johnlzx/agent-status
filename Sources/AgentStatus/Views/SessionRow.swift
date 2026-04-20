@@ -7,9 +7,7 @@ struct SessionRow: View {
     @State private var hover = false
 
     var body: some View {
-        Button(action: {
-            TerminalFocus.focus(session)
-        }) {
+        Button(action: { TerminalFocus.focus(session) }) {
             content
         }
         .buttonStyle(.plain)
@@ -18,119 +16,108 @@ struct SessionRow: View {
         .onHover { hover = $0 }
     }
 
-    private var isFocusable: Bool {
-        (session.hostPID ?? 0) > 0
-    }
+    private var isFocusable: Bool { (session.hostPID ?? 0) > 0 }
 
     private var helpText: String {
-        if !isFocusable {
-            return "No terminal location captured for this session."
-        }
-        if let tty = session.hostTTY, !tty.isEmpty {
-            return "Click to focus \(tty)"
-        }
+        if !isFocusable { return "No terminal location captured for this session." }
+        if let tty = session.hostTTY, !tty.isEmpty { return "Click to focus \(tty)" }
         return "Click to focus the terminal"
-    }
-
-    private var rowBackground: Color {
-        if !isFocusable { return .clear }
-        return hover ? Color.primary.opacity(0.08) : .clear
     }
 
     @ViewBuilder
     private var content: some View {
         HStack(spacing: 10) {
-            Image(systemName: session.kind.symbolName)
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-                .frame(width: 22, alignment: .center)
+            // state gear — 22x22 chunk with 14-pixel grid
+            PixelGear(
+                palette: GearPalette.forState(session.state),
+                pixels: 14,
+                rotates: session.state == .running,
+                rpm: 0.35,
+                pulses: session.state == .waiting
+            )
+            .frame(width: 22, height: 22)
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 5) {
-                    Text(session.kind.displayName)
-                        .font(.system(size: 12, weight: .semibold))
-                    if session.kind == .codex {
-                        Text("coarse")
-                            .font(.system(size: 9, weight: .medium))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.gray.opacity(0.16))
-                            .foregroundStyle(.secondary)
-                            .clipShape(Capsule())
-                    }
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    statePill
                     if isFocusable, let tty = session.hostTTY, !tty.isEmpty {
-                        Text(tty)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.tertiary)
+                        Text(tty.uppercased())
+                            .font(SteampunkFonts.pixel(7))
+                            .foregroundStyle(Steam.steamDim)
                     }
                 }
                 Text(shortCwd)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .font(SteampunkFonts.pixel(8))
+                    .foregroundStyle(Steam.steam)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 if let note = session.note, !note.isEmpty, session.state == .waiting {
-                    Text(note)
-                        .font(.system(size: 10))
-                        .foregroundStyle(stateColor(.waiting))
+                    Text(note.uppercased())
+                        .font(SteampunkFonts.pixel(7))
+                        .foregroundStyle(Steam.rustBright)
                         .lineLimit(1)
                 }
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 6)
 
-            VStack(alignment: .trailing, spacing: 3) {
-                statePill
-                Text(ageString)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-            }
+            Text(ageString)
+                .font(SteampunkFonts.pixel(7))
+                .foregroundStyle(Steam.steamDim)
+                .monospacedDigit()
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Steam.innerBG)
+                .brassBevel(highlight: Steam.brassDim, shadow: Steam.ink)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .contentShape(Rectangle())
         .background(rowBackground)
     }
 
-    private var shortCwd: String {
-        if session.cwd.isEmpty { return "(unknown)" }
-        let home = NSHomeDirectory()
-        if session.cwd.hasPrefix(home) {
-            return "~" + session.cwd.dropFirst(home.count)
+    private var rowBackground: some View {
+        ZStack {
+            hover && isFocusable ? Steam.plateBGHi : Steam.plateBG
+            // bottom hairline divider in brass dim
+            GeometryReader { geo in
+                Path(CGRect(x: 10, y: geo.size.height - 1, width: geo.size.width - 20, height: 1))
+                    .fill(Steam.brassDim.opacity(0.5))
+            }
         }
-        return session.cwd
     }
 
-    @ViewBuilder
     private var statePill: some View {
-        let c = stateColor(session.state)
-        HStack(spacing: 4) {
-            Circle()
-                .fill(c)
-                .frame(width: 6, height: 6)
-            Text(session.state.label)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
+        let colors = pillColors(session.state)
+        return Text(session.state.label)
+            .font(SteampunkFonts.pixel(8))
+            .foregroundStyle(colors.fg)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(colors.bg)
+            .brassBevel(highlight: colors.fg.opacity(0.5), shadow: Steam.ink)
+    }
+
+    private func pillColors(_ state: AgentState) -> (bg: Color, fg: Color) {
+        switch state {
+        case .idle:    return (Steam.brassDim.opacity(0.35),   Steam.brassLight)
+        case .running: return (Steam.amber.opacity(0.25),      Steam.amberHot)
+        case .waiting: return (Steam.rust.opacity(0.45),       Steam.rustBright)
+        case .unknown: return (Steam.steamFaint.opacity(0.25), Steam.steamDim)
         }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
-        .background(c.opacity(0.15))
-        .foregroundStyle(c)
-        .clipShape(Capsule())
+    }
+
+    private var shortCwd: String {
+        if session.cwd.isEmpty { return "(UNKNOWN)" }
+        let home = NSHomeDirectory()
+        if session.cwd.hasPrefix(home) { return "~" + session.cwd.dropFirst(home.count) }
+        return session.cwd
     }
 
     private var ageString: String {
         let s = max(0, Int(now.timeIntervalSince(session.lastEventAt)))
-        if s < 60 { return "\(s)s" }
-        if s < 3600 { return "\(s / 60)m" }
-        return "\(s / 3600)h"
-    }
-
-    private func stateColor(_ state: AgentState) -> Color {
-        switch state {
-        case .idle: return Color(nsColor: .systemGray)
-        case .running: return Color(nsColor: .systemGreen)
-        case .waiting: return Color(nsColor: .systemOrange)
-        case .unknown: return Color(nsColor: .tertiaryLabelColor)
-        }
+        if s < 60 { return "\(s)S" }
+        if s < 3600 { return "\(s / 60)M" }
+        return "\(s / 3600)H"
     }
 }

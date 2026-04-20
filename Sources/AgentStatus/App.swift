@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import CoreText
 
 @main
 struct AgentStatusApp: App {
@@ -21,12 +22,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     nonisolated func applicationDidFinishLaunching(_ notification: Notification) {
         MainActor.assumeIsolated {
+            SteampunkFonts.registerBundledFonts()
             IPCServer.shared.start(store: store)
-            CodexScanner.shared.start(store: store)
+            scheduleStaleSweeps()
         }
     }
 
-    nonisolated func applicationWillTerminate(_ notification: Notification) {
-        CodexScanner.shared.stop()
+    private func scheduleStaleSweeps() {
+        let store = self.store
+        Task.detached(priority: .utility) {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 30_000_000_000) // 30s
+                await MainActor.run { store.sweepStale() }
+            }
+        }
     }
 }
